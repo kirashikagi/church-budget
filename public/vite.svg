@@ -1,13 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
- <!-- Фон: Темный сланец (фундамент) -->
- <circle cx="50" cy="50" r="48" fill="#0f172a" />
- 
- <!-- Крест: Изумрудный (процветание и жизнь) -->
- <!-- Вертикаль -->
- <rect x="42" y="25" width="16" height="50" rx="2" fill="#10b981" />
- <!-- Горизонталь -->
- <rect x="25" y="42" width="50" height="16" rx="2" fill="#10b981" />
- 
- <!-- Деталь: График роста (тонкая линия поверх) -->
- <path d="M30 65 L45 55 L55 60 L70 40" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+  <circle cx="50" cy="50" r="48" fill="#0f172a" />
+  <rect x="42" y="25" width="16" height="50" rx="2" fill="#10b981" />
+  <rect x="25" y="42" width="50" height="16" rx="2" fill="#10b981" />
+  <path d="M30 65 L45 55 L55 60 L70 40" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
 </svg>
