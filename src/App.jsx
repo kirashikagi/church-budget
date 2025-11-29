@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
  PlusCircle, Wallet, TrendingUp, TrendingDown, Trash2, PieChart,
- AlertCircle, Printer, Users, UserPlus, LayoutDashboard, LogIn, LogOut
+ Printer, Users, UserPlus, LayoutDashboard, LogIn, LogOut, FileText
 } from 'lucide-react';
 
 // Импорты Firebase
@@ -92,7 +92,7 @@ const App = () => {
      date: form.date,
      memberId: form.memberId || null,
      createdAt: serverTimestamp(),
-     createdBy: user.email // Аудит: кто добавил запись
+     createdBy: user.email
    });
 
    setForm({ ...form, amount: '', description: '' });
@@ -156,6 +156,50 @@ const App = () => {
  const memberStats = getMemberStats();
  const handlePrint = () => window.print();
 
+ // --- FULL REPORT GENERATOR ---
+ const downloadFullReport = () => {
+   const date = new Date().toLocaleDateString('ru-RU');
+   let report = `=== ПОЛНЫЙ ОТЧЕТ БЮДЖЕТА ЦЕРКВИ ===\n`;
+   report += `Дата выгрузки: ${date}\n`;
+   report += `Сформировал: ${user.email}\n\n`;
+
+   report += `--- 1. ФИНАНСОВАЯ СВОДКА ---\n`;
+   report += `ТЕКУЩИЙ БАЛАНС: ${balance.toLocaleString()} руб.\n`;
+   report += `Всего приход:   ${totalIncome.toLocaleString()} руб.\n`;
+   report += `Всего расход:   ${totalExpense.toLocaleString()} руб.\n`;
+   report += `Маржа:          ${totalIncome > 0 ? ((balance / totalIncome) * 100).toFixed(1) : 0}%\n\n`;
+
+   report += `--- 2. СТРУКТУРА РАСХОДОВ ---\n`;
+   sortedExpenses.forEach(([cat, amt]) => {
+     const percent = totalExpense > 0 ? ((amt / totalExpense) * 100).toFixed(1) : 0;
+     report += `${cat.padEnd(20)}: ${amt.toLocaleString()} руб. (${percent}%)\n`;
+   });
+   report += `\n`;
+
+   report += `--- 3. СТАТИСТИКА ПО ЛЮДЯМ (Даяния) ---\n`;
+   report += `ИМЯ                 | ДЕСЯТИНА  | ПОЖЕРТВ.  | ОБЕТЫ     | ИТОГО\n`;
+   report += `-`.repeat(70) + `\n`;
+   memberStats.forEach(m => {
+       report += `${m.name.padEnd(20)}| ${m.tithe.toString().padEnd(10)}| ${m.offering.toString().padEnd(10)}| ${m.vow.toString().padEnd(10)}| ${m.total}\n`;
+   });
+   report += `\n`;
+
+   report += `--- 4. ПОЛНЫЙ ЖУРНАЛ ОПЕРАЦИЙ (Всего: ${transactions.length}) ---\n`;
+   transactions.forEach(t => {
+       const sign = t.type === 'income' ? '+' : '-';
+       const member = t.memberId ? members.find(m => m.id === t.memberId)?.name : '---';
+       report += `[${t.date}] ${sign}${t.amount} | ${t.category} | ${t.description} (От: ${member})\n`;
+   });
+
+   const element = document.createElement("a");
+   const file = new Blob([report], {type: 'text/plain'});
+   element.href = URL.createObjectURL(file);
+   element.download = `Church_Full_Audit_${new Date().toISOString().split('T')[0]}.txt`;
+   document.body.appendChild(element);
+   element.click();
+   document.body.removeChild(element);
+ };
+
  // --- RENDER LOGIN SCREEN ---
  if (loading) return <div className="min-h-screen flex items-center justify-center">Загрузка...</div>;
  
@@ -180,7 +224,8 @@ const App = () => {
 
  // --- MAIN APP RENDER ---
  return (
-   <div className="min-h-screen bg-slate-50 text-slate-800 font-sans p-4 md:p-8 print:bg-white print:p-0">
+   // ИЗМЕНЕНИЕ: w-full вместо max-w-6xl
+   <div className="min-h-screen bg-slate-50 text-slate-800 font-sans p-4 print:bg-white print:p-0">
      <style>{`
        @media print {
          .no-print { display: none !important; }
@@ -189,7 +234,8 @@ const App = () => {
        }
      `}</style>
 
-     <div className="max-w-6xl mx-auto space-y-8">
+     {/* ИЗМЕНЕНИЕ: Убрал ограничение ширины контейнера */}
+     <div className="w-full space-y-8">
        {/* Header & Nav */}
        <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-6 border-slate-200">
          <div>
@@ -215,7 +261,19 @@ const App = () => {
              <Users className="w-4 h-4" />
              Люди
            </button>
+           
            <div className="w-px h-6 bg-slate-300 mx-2"></div>
+           
+           {/* КНОПКА СКАЧИВАНИЯ */}
+           <button
+               onClick={downloadFullReport}
+               className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 shadow-sm transition-colors"
+               title="Скачать полный аудит"
+           >
+               <FileText className="w-4 h-4" />
+               Скачать отчет
+           </button>
+
            <button onClick={handlePrint} className="p-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50" title="Печать"><Printer className="w-4 h-4" /></button>
            <button onClick={handleLogout} className="p-2 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50" title="Выйти"><LogOut className="w-4 h-4" /></button>
          </div>
