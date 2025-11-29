@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
  PlusCircle, Wallet, TrendingUp, TrendingDown, Trash2, PieChart,
- Printer, Users, UserPlus, LayoutDashboard, LogIn, LogOut, FileText
+ Printer, Users, UserPlus, LayoutDashboard, LogIn, LogOut, FileText, Menu, X
 } from 'lucide-react';
 
 // Импорты Firebase
@@ -16,6 +16,7 @@ const App = () => {
  const [user, setUser] = useState(null);
  const [activeTab, setActiveTab] = useState('dashboard');
  const [loading, setLoading] = useState(true);
+ const [isMenuOpen, setIsMenuOpen] = useState(false); // Для мобильного меню
 
  // Данные из Firebase
  const [members, setMembers] = useState([]);
@@ -73,7 +74,6 @@ const App = () => {
    try {
      await signInWithPopup(auth, googleProvider);
    } catch (error) {
-     console.error("Login failed", error);
      alert("Ошибка входа: " + error.message);
    }
  };
@@ -110,7 +110,7 @@ const App = () => {
  };
 
  const deleteTransaction = async (id) => {
-   if (window.confirm('Вы уверены, что хотите удалить эту запись?')) {
+   if (window.confirm('Удалить запись?')) {
      await deleteDoc(doc(db, "transactions", id));
    }
  };
@@ -143,13 +143,9 @@ const App = () => {
      const tithe = memberTrans.filter(t => t.category === 'Десятина').reduce((sum, t) => sum + t.amount, 0);
      const offering = memberTrans.filter(t => t.category === 'Пожертвования').reduce((sum, t) => sum + t.amount, 0);
      const vow = memberTrans.filter(t => t.category === 'Обеты').reduce((sum, t) => sum + t.amount, 0);
-     const other = memberTrans.filter(t => t.category === 'Другие').reduce((sum, t) => sum + t.amount, 0);
-     const total = tithe + offering + vow + other;
+     const total = tithe + offering + vow + memberTrans.filter(t => t.category === 'Другие').reduce((sum, t) => sum + t.amount, 0);
      
-     const dates = memberTrans.map(t => new Date(t.date));
-     const lastDate = dates.length > 0 ? new Date(Math.max.apply(null, dates)) : null;
-
-     return { ...member, tithe, offering, vow, other, total, lastDate };
+     return { ...member, tithe, offering, vow, total };
    }).sort((a, b) => b.total - a.total);
  };
 
@@ -159,234 +155,192 @@ const App = () => {
  // --- FULL REPORT GENERATOR ---
  const downloadFullReport = () => {
    const date = new Date().toLocaleDateString('ru-RU');
-   let report = `=== ПОЛНЫЙ ОТЧЕТ БЮДЖЕТА ЦЕРКВИ ===\n`;
-   report += `Дата выгрузки: ${date}\n`;
-   report += `Сформировал: ${user.email}\n\n`;
-
-   report += `--- 1. ФИНАНСОВАЯ СВОДКА ---\n`;
-   report += `ТЕКУЩИЙ БАЛАНС: ${balance.toLocaleString()} руб.\n`;
-   report += `Всего приход:   ${totalIncome.toLocaleString()} руб.\n`;
-   report += `Всего расход:   ${totalExpense.toLocaleString()} руб.\n`;
-   report += `Маржа:          ${totalIncome > 0 ? ((balance / totalIncome) * 100).toFixed(1) : 0}%\n\n`;
-
-   report += `--- 2. СТРУКТУРА РАСХОДОВ ---\n`;
+   let report = `=== ПОЛНЫЙ ОТЧЕТ БЮДЖЕТА ===\nДата: ${date}\nСформировал: ${user.email}\n\n`;
+   report += `БАЛАНС: ${balance.toLocaleString()} ₽\nПриход: ${totalIncome.toLocaleString()} ₽\nРасход: ${totalExpense.toLocaleString()} ₽\n\n`;
+   
+   report += `--- РАСХОДЫ ---\n`;
    sortedExpenses.forEach(([cat, amt]) => {
      const percent = totalExpense > 0 ? ((amt / totalExpense) * 100).toFixed(1) : 0;
-     report += `${cat.padEnd(20)}: ${amt.toLocaleString()} руб. (${percent}%)\n`;
+     report += `${cat}: ${amt.toLocaleString()} ₽ (${percent}%)\n`;
    });
-   report += `\n`;
-
-   report += `--- 3. СТАТИСТИКА ПО ЛЮДЯМ (Даяния) ---\n`;
-   report += `ИМЯ                 | ДЕСЯТИНА  | ПОЖЕРТВ.  | ОБЕТЫ     | ИТОГО\n`;
-   report += `-`.repeat(70) + `\n`;
-   memberStats.forEach(m => {
-       report += `${m.name.padEnd(20)}| ${m.tithe.toString().padEnd(10)}| ${m.offering.toString().padEnd(10)}| ${m.vow.toString().padEnd(10)}| ${m.total}\n`;
-   });
-   report += `\n`;
-
-   report += `--- 4. ПОЛНЫЙ ЖУРНАЛ ОПЕРАЦИЙ (Всего: ${transactions.length}) ---\n`;
+   report += `\n--- ЛЮДИ (Даяния) ---\n`;
+   memberStats.forEach(m => report += `${m.name}: ${m.total} ₽ (Дес: ${m.tithe}, Жертв: ${m.offering})\n`);
+   report += `\n--- ЖУРНАЛ ---\n`;
    transactions.forEach(t => {
        const sign = t.type === 'income' ? '+' : '-';
-       const member = t.memberId ? members.find(m => m.id === t.memberId)?.name : '---';
-       report += `[${t.date}] ${sign}${t.amount} | ${t.category} | ${t.description} (От: ${member})\n`;
+       report += `[${t.date}] ${sign}${t.amount} | ${t.category} | ${t.description}\n`;
    });
 
    const element = document.createElement("a");
    const file = new Blob([report], {type: 'text/plain'});
    element.href = URL.createObjectURL(file);
-   element.download = `Church_Full_Audit_${new Date().toISOString().split('T')[0]}.txt`;
+   element.download = `Budget_Full_${new Date().toISOString().split('T')[0]}.txt`;
    document.body.appendChild(element);
    element.click();
    document.body.removeChild(element);
  };
 
- // --- RENDER LOGIN SCREEN ---
- if (loading) return <div className="min-h-screen flex items-center justify-center">Загрузка...</div>;
+ // --- LOGIN SCREEN ---
+ if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-500">Загрузка системы...</div>;
  
  if (!user) {
    return (
-     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-       <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-lg text-center">
-         <Wallet className="w-16 h-16 text-slate-900 mx-auto mb-6" />
-         <h1 className="text-2xl font-bold mb-2">Бюджет Церкви</h1>
-         <p className="text-slate-500 mb-8">Войдите, чтобы управлять финансами</p>
+     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-6">
+       <div className="max-w-md w-full bg-white p-10 rounded-2xl shadow-xl text-center border border-slate-200">
+         <div className="bg-slate-900 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+           <Wallet className="w-10 h-10 text-white" />
+         </div>
+         <h1 className="text-3xl font-bold mb-2 text-slate-800">Бюджет Церкви</h1>
+         <p className="text-slate-500 mb-8 text-lg">Управление ресурсами Царства</p>
          <button
            onClick={handleLogin}
-           className="w-full flex items-center justify-center gap-3 bg-slate-900 text-white py-3 px-4 rounded-lg hover:bg-slate-800 transition-all font-medium"
+           className="w-full flex items-center justify-center gap-3 bg-emerald-600 text-white py-4 px-6 rounded-xl hover:bg-emerald-700 transition-all font-semibold text-lg shadow-md active:scale-95"
          >
-           <LogIn className="w-5 h-5" />
-           Войти через Google
+           <LogIn className="w-6 h-6" />
+           Войти в систему
          </button>
        </div>
      </div>
    );
  }
 
- // --- MAIN APP RENDER ---
+ // --- APP INTERFACE ---
  return (
-   // ИЗМЕНЕНИЕ: w-full вместо max-w-6xl
-   <div className="min-h-screen bg-slate-50 text-slate-800 font-sans p-4 print:bg-white print:p-0">
-     <style>{`
-       @media print {
-         .no-print { display: none !important; }
-         .print-only { display: block !important; }
-         body { background: white; }
-       }
-     `}</style>
+   <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20 print:bg-white print:pb-0">
+     <style>{`@media print {.no-print { display: none !important; }}`}</style>
 
-     {/* ИЗМЕНЕНИЕ: Убрал ограничение ширины контейнера */}
-     <div className="w-full space-y-8">
-       {/* Header & Nav */}
-       <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-6 border-slate-200">
-         <div>
-           <h1 className="text-3xl font-bold text-slate-900">Бюджет Церкви</h1>
-           <div className="text-sm text-slate-500 mt-1 flex items-center gap-2">
-             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-             Онлайн: {user.email}
+     {/* STICKY HEADER */}
+     <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-sm px-4 py-3 flex justify-between items-center no-print">
+        <div className="flex items-center gap-3">
+           <div className={`p-2 rounded-lg ${balance >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+               <Wallet className="w-6 h-6" />
            </div>
-         </div>
-         
-         <div className="flex gap-2 mt-4 md:mt-0 items-center no-print flex-wrap">
-           <button
-             onClick={() => setActiveTab('dashboard')}
-             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'dashboard' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
-           >
-             <LayoutDashboard className="w-4 h-4" />
-             Обзор
-           </button>
-           <button
-             onClick={() => setActiveTab('people')}
-             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'people' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
-           >
-             <Users className="w-4 h-4" />
-             Люди
-           </button>
-           
-           <div className="w-px h-6 bg-slate-300 mx-2"></div>
-           
-           {/* КНОПКА СКАЧИВАНИЯ */}
-           <button
-               onClick={downloadFullReport}
-               className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 shadow-sm transition-colors"
-               title="Скачать полный аудит"
-           >
-               <FileText className="w-4 h-4" />
-               Скачать отчет
-           </button>
+           <div>
+               <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Баланс</p>
+               <p className="text-lg font-bold leading-none">{balance.toLocaleString()} ₽</p>
+           </div>
+        </div>
+        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 bg-slate-100 rounded-lg md:hidden">
+           {isMenuOpen ? <X className="w-6 h-6"/> : <Menu className="w-6 h-6"/>}
+        </button>
 
-           <button onClick={handlePrint} className="p-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-50" title="Печать"><Printer className="w-4 h-4" /></button>
-           <button onClick={handleLogout} className="p-2 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50" title="Выйти"><LogOut className="w-4 h-4" /></button>
-         </div>
+        {/* Desktop Nav */}
+        <div className="hidden md:flex gap-2">
+           <NavButtons activeTab={activeTab} setActiveTab={setActiveTab} downloadFullReport={downloadFullReport} handleLogout={handleLogout} />
+        </div>
+     </div>
+
+     {/* Mobile Menu */}
+     {isMenuOpen && (
+       <div className="md:hidden bg-white border-b border-slate-200 p-4 space-y-2 shadow-lg no-print">
+           <NavButtons activeTab={activeTab} setActiveTab={(tab) => {setActiveTab(tab); setIsMenuOpen(false)}} downloadFullReport={downloadFullReport} handleLogout={handleLogout} mobile />
        </div>
+     )}
 
-       {/* --- DASHBOARD --- */}
+     <div className="max-w-7xl mx-auto p-4 space-y-6">
+       
+       {/* --- DASHBOARD TAB --- */}
        {activeTab === 'dashboard' && (
          <>
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">
-               <div><p className="text-slate-500 text-sm">Баланс</p><p className="text-2xl font-bold">{balance.toLocaleString()} ₽</p></div>
-               <div className={`p-3 rounded-full ${balance >= 0 ? 'bg-emerald-100' : 'bg-red-100'}`}><Wallet className="w-6 h-6 text-slate-700"/></div>
+           {/* KPI Cards */}
+           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+               <p className="text-slate-400 text-xs mb-1">Приход</p>
+               <p className="text-lg font-bold text-slate-900">{totalIncome.toLocaleString()}</p>
+               <TrendingUp className="w-4 h-4 text-emerald-500 mt-2" />
              </div>
-             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">
-               <div><p className="text-slate-500 text-sm">Приход</p><p className="text-2xl font-bold">{totalIncome.toLocaleString()} ₽</p></div>
-               <div className="bg-blue-100 p-3 rounded-full"><TrendingUp className="w-6 h-6 text-blue-600"/></div>
+             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+               <p className="text-slate-400 text-xs mb-1">Расход</p>
+               <p className="text-lg font-bold text-slate-900">{totalExpense.toLocaleString()}</p>
+               <TrendingDown className="w-4 h-4 text-orange-500 mt-2" />
              </div>
-             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">
-               <div><p className="text-slate-500 text-sm">Расход</p><p className="text-2xl font-bold">{totalExpense.toLocaleString()} ₽</p></div>
-               <div className="bg-orange-100 p-3 rounded-full"><TrendingDown className="w-6 h-6 text-orange-600"/></div>
+             <div className="bg-slate-800 p-4 rounded-xl shadow-sm text-white col-span-2">
+               <p className="text-slate-400 text-xs mb-1">Маржа (Запас)</p>
+               <p className="text-2xl font-bold">
+                 {totalIncome > 0 ? ((balance / totalIncome) * 100).toFixed(1) : 0}%
+               </p>
              </div>
            </div>
 
-           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+             {/* Form & List */}
              <div className="lg:col-span-2 space-y-6">
+               
                {/* Transaction Form */}
-               <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 no-print">
-                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2"><PlusCircle className="w-5 h-5 text-blue-600" />Новая запись</h3>
-                 <form onSubmit={handleAddTransaction} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <div className="col-span-2 md:col-span-1">
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Тип</label>
-                      <div className="flex rounded-md shadow-sm">
-                        <button type="button" onClick={() => setForm({...form, type: 'income', category: incomeCategories[0]})} className={`flex-1 px-4 py-2 text-sm font-medium rounded-l-lg border ${form.type === 'income' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white'}`}>Приход</button>
-                        <button type="button" onClick={() => setForm({...form, type: 'expense', category: expenseCategories[0], memberId: ''})} className={`flex-1 px-4 py-2 text-sm font-medium rounded-r-lg border ${form.type === 'expense' ? 'bg-orange-600 text-white border-orange-600' : 'bg-white'}`}>Расход</button>
-                      </div>
+               <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 no-print">
+                 <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><PlusCircle className="w-5 h-5 text-blue-600" /> Добавить операцию</h3>
+                 <form onSubmit={handleAddTransaction} className="space-y-4">
+                   <div className="flex bg-slate-100 p-1 rounded-lg">
+                       <button type="button" onClick={() => setForm({...form, type: 'income'})} className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${form.type === 'income' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`}>Приход (+)</button>
+                       <button type="button" onClick={() => setForm({...form, type: 'expense', memberId: ''})} className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${form.type === 'expense' ? 'bg-white text-orange-700 shadow-sm' : 'text-slate-500'}`}>Расход (-)</button>
                    </div>
-                   <div className="col-span-2 md:col-span-1">
-                     <label className="block text-sm font-medium text-slate-700 mb-1">
-                       {form.type === 'income' ? 'От кого' : 'Контрагент'}
-                     </label>
-                     <select
-                       disabled={form.type === 'expense'}
-                       value={form.memberId}
-                       onChange={e => setForm({...form, memberId: e.target.value})}
-                       className="w-full rounded-lg border-slate-300 shadow-sm p-2 border disabled:bg-slate-100"
-                     >
-                       <option value="">-- Анонимно / Общий --</option>
-                       {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                     </select>
+
+                   <div className="grid grid-cols-2 gap-3">
+                       <input type="number" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded-lg p-3 text-lg font-semibold" placeholder="Сумма" />
+                       <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded-lg p-3" />
                    </div>
-                   <div>
-                     <label className="block text-sm font-medium text-slate-700 mb-1">Категория</label>
-                     <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full rounded-lg border p-2">
-                       {(form.type === 'income' ? incomeCategories : expenseCategories).map(c => <option key={c} value={c}>{c}</option>)}
-                     </select>
+
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded-lg p-3">
+                           {(form.type === 'income' ? incomeCategories : expenseCategories).map(c => <option key={c} value={c}>{c}</option>)}
+                       </select>
+                       <select disabled={form.type === 'expense'} value={form.memberId} onChange={e => setForm({...form, memberId: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded-lg p-3 disabled:opacity-50">
+                           <option value="">-- От кого (Анонимно) --</option>
+                           {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                       </select>
                    </div>
-                   <div>
-                     <label className="block text-sm font-medium text-slate-700 mb-1">Сумма</label>
-                     <input type="number" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className="w-full rounded-lg border p-2" placeholder="0.00" />
-                   </div>
-                   <div>
-                     <label className="block text-sm font-medium text-slate-700 mb-1">Дата</label>
-                     <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full rounded-lg border p-2" />
-                   </div>
-                   <div>
-                     <label className="block text-sm font-medium text-slate-700 mb-1">Описание</label>
-                     <input type="text" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full rounded-lg border p-2" />
-                   </div>
-                   <button type="submit" className="col-span-2 bg-slate-900 text-white py-2 rounded-lg hover:bg-slate-800">Добавить в базу</button>
+
+                   <input type="text" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded-lg p-3" placeholder="Описание (обязательно)" />
+                   
+                   <button type="submit" className="w-full bg-slate-900 text-white py-3 rounded-lg font-medium shadow-lg hover:bg-slate-800 active:scale-95 transition-all">
+                       Сохранить запись
+                   </button>
                  </form>
                </div>
 
                {/* List */}
                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                 <div className="px-6 py-4 border-b bg-slate-50"><h3 className="font-semibold text-slate-800">История операций</h3></div>
-                 <div className="divide-y divide-slate-100">
-                   {transactions.length === 0 ? <div className="p-4 text-center text-slate-400">Пусто</div> : transactions.map(t => {
-                     const memberName = t.memberId ? members.find(m => m.id === t.memberId)?.name : null;
-                     return (
-                       <div key={t.id} className="p-4 flex justify-between items-center text-sm">
-                         <div>
-                           <span className="font-medium text-slate-900">{t.category}</span>
-                           <span className="text-slate-500 mx-2">•</span>
-                           <span className="text-slate-500">{t.description}</span>
-                           {memberName && <span className="ml-2 px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full">{memberName}</span>}
-                           <div className="text-xs text-slate-400 mt-1">{new Date(t.date).toLocaleDateString('ru-RU')}</div>
-                         </div>
-                         <div className="flex items-center gap-3">
-                           <span className={t.type === 'income' ? 'text-emerald-600 font-bold' : 'text-slate-600 font-bold'}>
-                             {t.type === 'income' ? '+' : '-'}{t.amount.toLocaleString()} ₽
-                           </span>
-                           <button onClick={() => deleteTransaction(t.id)} className="text-slate-300 hover:text-red-500 no-print"><Trash2 className="w-4 h-4"/></button>
-                         </div>
+                  <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700">Лента операций</div>
+                  <div className="divide-y divide-slate-100">
+                   {transactions.length === 0 ? <div className="p-6 text-center text-slate-400">Пока пусто</div> : transactions.map(t => (
+                       <div key={t.id} className="p-4 flex justify-between items-start gap-3 hover:bg-slate-50">
+                           <div className="flex-1">
+                               <div className="flex justify-between">
+                                   <span className="font-semibold text-slate-800">{t.category}</span>
+                                   <span className={`font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                                       {t.type === 'income' ? '+' : '-'}{t.amount.toLocaleString()}
+                                   </span>
+                               </div>
+                               <div className="text-sm text-slate-500 mt-1">{t.description}</div>
+                               <div className="text-xs text-slate-400 mt-2 flex gap-2">
+                                   <span>{new Date(t.date).toLocaleDateString()}</span>
+                                   {t.memberId && members.find(m => m.id === t.memberId) && (
+                                       <span className="bg-slate-100 px-1.5 rounded text-slate-600">
+                                           {members.find(m => m.id === t.memberId).name}
+                                       </span>
+                                   )}
+                               </div>
+                           </div>
+                           <button onClick={() => deleteTransaction(t.id)} className="text-slate-300 hover:text-red-500 p-1 no-print"><Trash2 className="w-4 h-4"/></button>
                        </div>
-                     )
-                   })}
-                 </div>
+                   ))}
+                  </div>
                </div>
              </div>
 
-             {/* Stats Sidebar */}
+             {/* Sidebar Stats */}
              <div className="space-y-6">
-               <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                  <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><PieChart className="w-5 h-5 text-orange-600"/> Расходы</h3>
-                  <div className="space-y-3">
-                    {sortedExpenses.length === 0 ? <p className="text-sm text-slate-400">Нет данных</p> : sortedExpenses.map(([cat, amt]) => (
-                      <div key={cat} className="text-sm">
-                        <div className="flex justify-between mb-1"><span>{cat}</span><span className="font-medium">{amt.toLocaleString()} ₽</span></div>
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full"><div className="bg-orange-500 h-1.5 rounded-full" style={{width: `${(amt/totalExpense)*100}%`}}></div></div>
-                      </div>
-                    ))}
-                  </div>
-               </div>
+                <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                   <h3 className="font-bold text-slate-800 mb-4">Топ расходов</h3>
+                   <div className="space-y-4">
+                       {sortedExpenses.map(([cat, amt]) => (
+                            <div key={cat}>
+                               <div className="flex justify-between text-sm mb-1"><span className="text-slate-600">{cat}</span><span className="font-bold">{amt.toLocaleString()}</span></div>
+                               <div className="w-full bg-slate-100 h-2 rounded-full"><div className="bg-orange-500 h-2 rounded-full" style={{width: `${(amt/totalExpense)*100}%`}}></div></div>
+                            </div>
+                       ))}
+                   </div>
+                </div>
              </div>
            </div>
          </>
@@ -394,50 +348,58 @@ const App = () => {
 
        {/* --- PEOPLE TAB --- */}
        {activeTab === 'people' && (
-         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-           <div className="lg:col-span-1 space-y-6 no-print">
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                 <h3 className="font-semibold mb-4 flex items-center gap-2"><UserPlus className="w-5 h-5 text-blue-600"/> Добавить</h3>
-                 <form onSubmit={handleAddMember} className="space-y-4">
-                   <input type="text" placeholder="ФИО" className="w-full border p-2 rounded-lg" value={newMemberName} onChange={e => setNewMemberName(e.target.value)} />
-                   <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Создать</button>
-                 </form>
-              </div>
-           </div>
-           <div className="lg:col-span-3">
-             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-               <div className="px-6 py-4 border-b bg-slate-50 flex justify-between items-center"><h3 className="font-semibold">Даяния прихожан</h3></div>
-               <div className="overflow-x-auto">
-                 <table className="w-full text-sm text-left">
-                   <thead className="bg-slate-50 text-slate-500 font-medium border-b">
-                     <tr>
-                       <th className="px-6 py-3">Имя</th>
-                       <th className="px-6 py-3 text-right">Десятины</th>
-                       <th className="px-6 py-3 text-right">Жертвы</th>
-                       <th className="px-6 py-3 text-right">Обеты</th>
-                       <th className="px-6 py-3 text-right">Итого</th>
-                     </tr>
+         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center no-print">
+               <h3 className="font-bold">Люди и Даяния</h3>
+               <form onSubmit={handleAddMember} className="flex gap-2">
+                   <input type="text" value={newMemberName} onChange={e => setNewMemberName(e.target.value)} placeholder="Новое имя" className="border rounded-lg px-3 py-1 text-sm" />
+                   <button type="submit" className="bg-blue-600 text-white p-1.5 rounded-lg"><PlusCircle className="w-4 h-4"/></button>
+               </form>
+            </div>
+            <div className="overflow-x-auto">
+               <table className="w-full text-sm text-left">
+                   <thead className="bg-slate-50 text-slate-500 font-medium">
+                       <tr><th className="p-3">Имя</th><th className="p-3 text-right">Десятина</th><th className="p-3 text-right">Всего</th></tr>
                    </thead>
                    <tbody className="divide-y divide-slate-100">
-                     {memberStats.map(m => (
-                       <tr key={m.id} className="hover:bg-slate-50">
-                         <td className="px-6 py-4 font-medium">{m.name}</td>
-                         <td className="px-6 py-4 text-right">{m.tithe > 0 ? m.tithe.toLocaleString() : '-'}</td>
-                         <td className="px-6 py-4 text-right">{m.offering > 0 ? m.offering.toLocaleString() : '-'}</td>
-                         <td className="px-6 py-4 text-right font-bold text-purple-700">{m.vow > 0 ? m.vow.toLocaleString() : '-'}</td>
-                         <td className="px-6 py-4 text-right font-bold">{m.total.toLocaleString()}</td>
-                       </tr>
-                     ))}
+                       {memberStats.map(m => (
+                           <tr key={m.id}>
+                               <td className="p-3 font-medium">{m.name}</td>
+                               <td className="p-3 text-right text-emerald-600">{m.tithe.toLocaleString()}</td>
+                               <td className="p-3 text-right font-bold">{m.total.toLocaleString()}</td>
+                           </tr>
+                       ))}
                    </tbody>
-                 </table>
-               </div>
-             </div>
-           </div>
+               </table>
+            </div>
          </div>
        )}
+
      </div>
    </div>
  );
 };
+
+// Sub-component for Menu Buttons
+const NavButtons = ({activeTab, setActiveTab, downloadFullReport, handleLogout, mobile}) => {
+   const baseClass = mobile ? "w-full justify-start py-3 px-2 text-base" : "text-sm px-3 py-2";
+   return (
+       <>
+           <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-2 rounded-lg font-medium transition-colors ${baseClass} ${activeTab === 'dashboard' ? 'bg-slate-900 text-white' : 'hover:bg-slate-100 text-slate-600'}`}>
+               <LayoutDashboard className="w-4 h-4" /> Обзор
+           </button>
+           <button onClick={() => setActiveTab('people')} className={`flex items-center gap-2 rounded-lg font-medium transition-colors ${baseClass} ${activeTab === 'people' ? 'bg-slate-900 text-white' : 'hover:bg-slate-100 text-slate-600'}`}>
+               <Users className="w-4 h-4" /> Люди
+           </button>
+           <div className={`h-px bg-slate-200 my-1 ${!mobile && 'hidden'}`}></div>
+           <button onClick={downloadFullReport} className={`flex items-center gap-2 text-emerald-700 hover:bg-emerald-50 rounded-lg font-medium transition-colors ${baseClass}`}>
+               <FileText className="w-4 h-4" /> Скачать отчет
+           </button>
+           <button onClick={handleLogout} className={`flex items-center gap-2 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-colors ${baseClass}`}>
+               <LogOut className="w-4 h-4" /> Выйти
+           </button>
+       </>
+   )
+}
 
 export default App;
