@@ -110,8 +110,15 @@ const App = () => {
  };
 
  const deleteTransaction = async (id) => {
-   if (window.confirm('Удалить запись?')) {
+   if (window.confirm('Удалить эту запись из истории?')) {
      await deleteDoc(doc(db, "transactions", id));
+   }
+ };
+
+ // НОВАЯ ФУНКЦИЯ: Удаление человека
+ const deleteMember = async (id, name) => {
+   if (window.confirm(`Вы уверены, что хотите удалить ${name} из списка? История его операций сохранится, но имя пропадет.`)) {
+     await deleteDoc(doc(db, "members", id));
    }
  };
 
@@ -203,18 +210,19 @@ const App = () => {
    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20 print:bg-white print:pb-0">
      <style>{`@media print {.no-print { display: none !important; }}`}</style>
 
-     {/* STICKY HEADER */}
-     <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-sm px-4 py-3 flex justify-between items-center no-print">
+     {/* --- НОВАЯ ПЛАВАЮЩАЯ ПАНЕЛЬ (ОПУЩЕНА НИЖЕ) --- */}
+     {/* Я добавил top-3, margin (m-3) и rounded-2xl, чтобы оторвать её от края */}
+     <div className="sticky top-2 z-50 mx-3 mt-3 bg-white/95 backdrop-blur-sm border border-slate-200/60 shadow-lg rounded-2xl px-4 py-3 flex justify-between items-center no-print">
         <div className="flex items-center gap-3">
-           <div className={`p-2 rounded-lg ${balance >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+           <div className={`p-2 rounded-xl ${balance >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                <Wallet className="w-6 h-6" />
            </div>
            <div>
-               <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Баланс</p>
-               <p className="text-lg font-bold leading-none">{balance.toLocaleString()} ₽</p>
+               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Баланс</p>
+               <p className="text-xl font-black leading-none tracking-tight">{balance.toLocaleString()} ₽</p>
            </div>
         </div>
-        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 bg-slate-100 rounded-lg md:hidden">
+        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2.5 bg-slate-100 rounded-xl md:hidden active:scale-95 transition-transform">
            {isMenuOpen ? <X className="w-6 h-6"/> : <Menu className="w-6 h-6"/>}
         </button>
 
@@ -226,12 +234,12 @@ const App = () => {
 
      {/* Mobile Menu */}
      {isMenuOpen && (
-       <div className="md:hidden bg-white border-b border-slate-200 p-4 space-y-2 shadow-lg no-print absolute w-full z-40">
+       <div className="md:hidden fixed inset-x-3 top-20 bg-white border border-slate-200 rounded-2xl p-2 space-y-1 shadow-2xl z-40 no-print animate-in slide-in-from-top-4 fade-in duration-200">
            <NavButtons activeTab={activeTab} setActiveTab={(tab) => {setActiveTab(tab); setIsMenuOpen(false)}} downloadFullReport={downloadFullReport} handleLogout={handleLogout} mobile />
        </div>
      )}
 
-     {/* MAIN CONTAINER: w-full for full width, px-2 for minimal padding on mobile */}
+     {/* MAIN CONTAINER */}
      <div className="w-full max-w-7xl mx-auto px-2 md:px-4 py-4 space-y-6">
        
        {/* --- DASHBOARD TAB --- */}
@@ -239,18 +247,18 @@ const App = () => {
          <>
            {/* KPI Cards */}
            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-               <p className="text-slate-400 text-xs mb-1">Приход</p>
+             <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+               <p className="text-slate-400 text-xs font-medium mb-1">Приход</p>
                <p className="text-lg font-bold text-slate-900">{totalIncome.toLocaleString()}</p>
                <TrendingUp className="w-4 h-4 text-emerald-500 mt-2" />
              </div>
-             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-               <p className="text-slate-400 text-xs mb-1">Расход</p>
+             <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+               <p className="text-slate-400 text-xs font-medium mb-1">Расход</p>
                <p className="text-lg font-bold text-slate-900">{totalExpense.toLocaleString()}</p>
                <TrendingDown className="w-4 h-4 text-orange-500 mt-2" />
              </div>
-             <div className="bg-slate-800 p-4 rounded-xl shadow-sm text-white col-span-2">
-               <p className="text-slate-400 text-xs mb-1">Маржа</p>
+             <div className="bg-slate-900 p-4 rounded-2xl shadow-sm text-white col-span-2">
+               <p className="text-slate-400 text-xs font-medium mb-1">Маржа</p>
                <p className="text-2xl font-bold">
                  {totalIncome > 0 ? ((balance / totalIncome) * 100).toFixed(1) : 0}%
                </p>
@@ -261,30 +269,30 @@ const App = () => {
              <div className="lg:col-span-2 space-y-6">
                
                {/* Transaction Form */}
-               <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-slate-200 no-print">
-                 <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><PlusCircle className="w-5 h-5 text-blue-600" /> Добавить операцию</h3>
+               <div className="bg-white p-4 md:p-6 rounded-3xl shadow-sm border border-slate-200 no-print">
+                 <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-lg"><PlusCircle className="w-5 h-5 text-blue-600" /> Добавить</h3>
                  <form onSubmit={handleAddTransaction} className="space-y-4">
-                   <div className="flex bg-slate-100 p-1 rounded-lg">
-                       <button type="button" onClick={() => setForm({...form, type: 'income'})} className={`flex-1 py-3 rounded-md text-sm font-bold transition-all ${form.type === 'income' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`}>Приход (+)</button>
-                       <button type="button" onClick={() => setForm({...form, type: 'expense', memberId: ''})} className={`flex-1 py-3 rounded-md text-sm font-bold transition-all ${form.type === 'expense' ? 'bg-white text-orange-700 shadow-sm' : 'text-slate-500'}`}>Расход (-)</button>
+                   <div className="flex bg-slate-100 p-1 rounded-xl">
+                       <button type="button" onClick={() => setForm({...form, type: 'income'})} className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all ${form.type === 'income' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`}>Приход (+)</button>
+                       <button type="button" onClick={() => setForm({...form, type: 'expense', memberId: ''})} className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all ${form.type === 'expense' ? 'bg-white text-orange-700 shadow-sm' : 'text-slate-500'}`}>Расход (-)</button>
                    </div>
 
                    <div className="grid grid-cols-2 gap-3">
-                       <input type="number" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded-lg p-3 text-lg font-semibold" placeholder="Сумма" />
-                       <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded-lg p-3" />
+                       <input type="number" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded-xl p-3 text-lg font-semibold placeholder:text-slate-300" placeholder="0 ₽" />
+                       <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded-xl p-3 font-medium text-slate-600" />
                    </div>
 
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded-lg p-3 h-12">
+                        <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded-xl p-3 h-12 font-medium">
                            {(form.type === 'income' ? incomeCategories : expenseCategories).map(c => <option key={c} value={c}>{c}</option>)}
                        </select>
-                       <select disabled={form.type === 'expense'} value={form.memberId} onChange={e => setForm({...form, memberId: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded-lg p-3 disabled:opacity-50 h-12">
+                       <select disabled={form.type === 'expense'} value={form.memberId} onChange={e => setForm({...form, memberId: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded-xl p-3 disabled:opacity-50 h-12 font-medium">
                            <option value="">-- Анонимно --</option>
                            {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                        </select>
                    </div>
 
-                   <input type="text" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded-lg p-3" placeholder="Описание" />
+                   <input type="text" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full bg-slate-50 border-slate-200 rounded-xl p-3 placeholder:text-slate-300" placeholder="Описание операции" />
                    
                    <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 active:scale-95 transition-all">
                        Сохранить
@@ -293,29 +301,29 @@ const App = () => {
                </div>
 
                {/* List */}
-               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                  <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700">Лента операций</div>
+               <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="p-5 bg-white border-b border-slate-100 font-bold text-slate-800 text-lg">Лента операций</div>
                   <div className="divide-y divide-slate-100">
-                   {transactions.length === 0 ? <div className="p-6 text-center text-slate-400">Пока пусто</div> : transactions.map(t => (
-                       <div key={t.id} className="p-4 flex justify-between items-start gap-3 hover:bg-slate-50">
+                   {transactions.length === 0 ? <div className="p-8 text-center text-slate-400">История пуста</div> : transactions.map(t => (
+                       <div key={t.id} className="p-4 flex justify-between items-start gap-3 hover:bg-slate-50 transition-colors">
                            <div className="flex-1">
-                               <div className="flex justify-between items-center">
-                                   <span className="font-semibold text-slate-800 text-base">{t.category}</span>
-                                   <span className={`font-bold text-base ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                               <div className="flex justify-between items-center mb-1">
+                                   <span className="font-bold text-slate-800">{t.category}</span>
+                                   <span className={`font-black text-base ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
                                        {t.type === 'income' ? '+' : '-'}{t.amount.toLocaleString()}
                                    </span>
                                </div>
-                               <div className="text-sm text-slate-500 mt-1 leading-snug">{t.description}</div>
-                               <div className="text-xs text-slate-400 mt-2 flex gap-2">
+                               <div className="text-sm text-slate-500 font-medium leading-snug">{t.description}</div>
+                               <div className="text-xs text-slate-400 mt-2 flex items-center gap-2 font-medium">
                                    <span>{new Date(t.date).toLocaleDateString()}</span>
                                    {t.memberId && members.find(m => m.id === t.memberId) && (
-                                       <span className="bg-slate-100 px-1.5 rounded text-slate-600">
+                                       <span className="bg-slate-100 px-2 py-0.5 rounded-full text-slate-600 text-[10px] uppercase tracking-wide">
                                            {members.find(m => m.id === t.memberId).name}
                                        </span>
                                    )}
                                </div>
                            </div>
-                           <button onClick={() => deleteTransaction(t.id)} className="text-slate-300 hover:text-red-500 p-2 no-print"><Trash2 className="w-5 h-5"/></button>
+                           <button onClick={() => deleteTransaction(t.id)} className="text-slate-300 hover:text-red-500 p-2 no-print active:scale-90 transition-transform"><Trash2 className="w-5 h-5"/></button>
                        </div>
                    ))}
                   </div>
@@ -324,13 +332,13 @@ const App = () => {
 
              {/* Sidebar Stats */}
              <div className="space-y-6">
-                <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-                   <h3 className="font-bold text-slate-800 mb-4">Топ расходов</h3>
+                <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200">
+                   <h3 className="font-bold text-slate-800 mb-4">Структура расходов</h3>
                    <div className="space-y-4">
                        {sortedExpenses.map(([cat, amt]) => (
                             <div key={cat}>
-                               <div className="flex justify-between text-sm mb-1"><span className="text-slate-600">{cat}</span><span className="font-bold">{amt.toLocaleString()}</span></div>
-                               <div className="w-full bg-slate-100 h-2 rounded-full"><div className="bg-orange-500 h-2 rounded-full" style={{width: `${(amt/totalExpense)*100}%`}}></div></div>
+                               <div className="flex justify-between text-sm mb-1.5 font-medium"><span className="text-slate-600">{cat}</span><span className="text-slate-900">{amt.toLocaleString()}</span></div>
+                               <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden"><div className="bg-orange-500 h-2.5 rounded-full" style={{width: `${(amt/totalExpense)*100}%`}}></div></div>
                             </div>
                        ))}
                    </div>
@@ -342,27 +350,49 @@ const App = () => {
 
        {/* --- PEOPLE TAB --- */}
        {activeTab === 'people' && (
-         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center no-print sticky top-0">
-               <h3 className="font-bold">Люди</h3>
-               <form onSubmit={handleAddMember} className="flex gap-2">
-                   <input type="text" value={newMemberName} onChange={e => setNewMemberName(e.target.value)} placeholder="Имя" className="border rounded-lg px-3 py-2 text-sm" />
-                   <button type="submit" className="bg-blue-600 text-white p-2 rounded-lg"><PlusCircle className="w-5 h-5"/></button>
+         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[50vh]">
+            {/* Sticky Header for People */}
+            <div className="p-4 border-b border-slate-100 bg-white flex justify-between items-center no-print sticky top-0 z-10">
+               <h3 className="font-bold text-lg text-slate-800">Люди</h3>
+               <form onSubmit={handleAddMember} className="flex gap-2 w-1/2 justify-end">
+                   <input type="text" value={newMemberName} onChange={e => setNewMemberName(e.target.value)} placeholder="Имя" className="border border-slate-200 bg-slate-50 rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:border-blue-500" />
+                   <button type="submit" className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 active:scale-95 transition-transform"><PlusCircle className="w-5 h-5"/></button>
                </form>
             </div>
+           
+            {/* НОВАЯ ТАБЛИЦА С УДАЛЕНИЕМ И ПОЖЕРТВОВАНИЯМИ */}
             <div className="overflow-x-auto">
                <table className="w-full text-sm text-left">
-                   <thead className="bg-slate-50 text-slate-500 font-medium">
-                       <tr><th className="p-3">Имя</th><th className="p-3 text-right">Десятина</th><th className="p-3 text-right">Всего</th></tr>
+                   <thead className="bg-slate-50 text-slate-500 font-semibold uppercase text-xs tracking-wider">
+                       <tr>
+                           <th className="p-4">Имя</th>
+                           <th className="p-4 text-right">Десятина</th>
+                           <th className="p-4 text-right">Жертвы</th>
+                           <th className="p-4 text-right">Всего</th>
+                           <th className="p-4 w-10"></th>
+                       </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-100">
                        {getMemberStats().map(m => (
-                           <tr key={m.id}>
-                               <td className="p-3 font-medium">{m.name}</td>
-                               <td className="p-3 text-right text-emerald-600">{m.tithe.toLocaleString()}</td>
-                               <td className="p-3 text-right font-bold">{m.total.toLocaleString()}</td>
+                           <tr key={m.id} className="group hover:bg-slate-50 transition-colors">
+                               <td className="p-4 font-bold text-slate-800">{m.name}</td>
+                               <td className="p-4 text-right text-emerald-600 font-medium">{m.tithe > 0 ? m.tithe.toLocaleString() : '-'}</td>
+                               <td className="p-4 text-right text-blue-600 font-medium">{m.offering > 0 ? m.offering.toLocaleString() : '-'}</td>
+                               <td className="p-4 text-right font-black text-slate-900">{m.total.toLocaleString()}</td>
+                               <td className="p-4 text-right">
+                                   <button
+                                       onClick={() => deleteMember(m.id, m.name)}
+                                       className="text-slate-300 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                       title="Удалить человека"
+                                   >
+                                       <Trash2 className="w-4 h-4" />
+                                   </button>
+                               </td>
                            </tr>
                        ))}
+                       {members.length === 0 && (
+                           <tr><td colSpan="5" className="p-8 text-center text-slate-400">Список пуст</td></tr>
+                       )}
                    </tbody>
                </table>
             </div>
@@ -375,20 +405,20 @@ const App = () => {
 
 // Sub-component for Menu Buttons
 const NavButtons = ({activeTab, setActiveTab, downloadFullReport, handleLogout, mobile}) => {
-   const baseClass = mobile ? "w-full justify-start py-3 px-4 text-base border-b border-slate-50" : "text-sm px-3 py-2";
+   const baseClass = mobile ? "w-full justify-start py-3 px-4 text-base font-medium rounded-xl hover:bg-slate-50" : "text-sm px-3 py-2";
    return (
        <>
-           <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-2 rounded-lg font-medium transition-colors ${baseClass} ${activeTab === 'dashboard' ? 'bg-slate-900 text-white' : 'hover:bg-slate-100 text-slate-600'}`}>
+           <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-2 rounded-xl transition-all ${baseClass} ${activeTab === 'dashboard' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'}`}>
                <LayoutDashboard className="w-4 h-4" /> Обзор
            </button>
-           <button onClick={() => setActiveTab('people')} className={`flex items-center gap-2 rounded-lg font-medium transition-colors ${baseClass} ${activeTab === 'people' ? 'bg-slate-900 text-white' : 'hover:bg-slate-100 text-slate-600'}`}>
+           <button onClick={() => setActiveTab('people')} className={`flex items-center gap-2 rounded-xl transition-all ${baseClass} ${activeTab === 'people' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'}`}>
                <Users className="w-4 h-4" /> Люди
            </button>
-           <div className={`h-px bg-slate-200 my-1 ${!mobile && 'hidden'}`}></div>
-           <button onClick={downloadFullReport} className={`flex items-center gap-2 text-emerald-700 hover:bg-emerald-50 rounded-lg font-medium transition-colors ${baseClass}`}>
+           <div className={`h-px bg-slate-100 my-1 ${!mobile && 'hidden'}`}></div>
+           <button onClick={downloadFullReport} className={`flex items-center gap-2 text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all ${baseClass}`}>
                <FileText className="w-4 h-4" /> Отчет
            </button>
-           <button onClick={handleLogout} className={`flex items-center gap-2 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-colors ${baseClass}`}>
+           <button onClick={handleLogout} className={`flex items-center gap-2 text-red-600 hover:bg-red-50 rounded-xl transition-all ${baseClass}`}>
                <LogOut className="w-4 h-4" /> Выйти
            </button>
        </>
