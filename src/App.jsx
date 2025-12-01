@@ -115,9 +115,9 @@ const App = () => {
    }
  };
 
- // НОВАЯ ФУНКЦИЯ: Удаление человека
+ // Удаление человека
  const deleteMember = async (id, name) => {
-   if (window.confirm(`Вы уверены, что хотите удалить ${name} из списка? История его операций сохранится, но имя пропадет.`)) {
+   if (window.confirm(`Вы уверены, что хотите удалить ${name} из списка?`)) {
      await deleteDoc(doc(db, "members", id));
    }
  };
@@ -169,7 +169,7 @@ const App = () => {
    });
    report += `\n--- ЛЮДИ (Даяния) ---\n`;
    const memberStats = getMemberStats();
-   memberStats.forEach(m => report += `${m.name}: ${m.total} ₽ (Дес: ${m.tithe}, Жертв: ${m.offering})\n`);
+   memberStats.forEach(m => report += `${m.name}: ${m.total} ₽ (Дес: ${m.tithe}, Жертв: ${m.offering}, Обет: ${m.vow})\n`);
    report += `\n--- ЖУРНАЛ ---\n`;
    transactions.forEach(t => {
        const sign = t.type === 'income' ? '+' : '-';
@@ -210,8 +210,7 @@ const App = () => {
    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20 print:bg-white print:pb-0">
      <style>{`@media print {.no-print { display: none !important; }}`}</style>
 
-     {/* --- НОВАЯ ПЛАВАЮЩАЯ ПАНЕЛЬ (ОПУЩЕНА НИЖЕ) --- */}
-     {/* Я добавил top-3, margin (m-3) и rounded-2xl, чтобы оторвать её от края */}
+     {/* FLOATING HEADER */}
      <div className="sticky top-2 z-50 mx-3 mt-3 bg-white/95 backdrop-blur-sm border border-slate-200/60 shadow-lg rounded-2xl px-4 py-3 flex justify-between items-center no-print">
         <div className="flex items-center gap-3">
            <div className={`p-2 rounded-xl ${balance >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
@@ -351,7 +350,6 @@ const App = () => {
        {/* --- PEOPLE TAB --- */}
        {activeTab === 'people' && (
          <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[50vh]">
-            {/* Sticky Header for People */}
             <div className="p-4 border-b border-slate-100 bg-white flex justify-between items-center no-print sticky top-0 z-10">
                <h3 className="font-bold text-lg text-slate-800">Люди</h3>
                <form onSubmit={handleAddMember} className="flex gap-2 w-1/2 justify-end">
@@ -360,7 +358,7 @@ const App = () => {
                </form>
             </div>
            
-            {/* НОВАЯ ТАБЛИЦА С УДАЛЕНИЕМ И ПОЖЕРТВОВАНИЯМИ */}
+            {/* ОБНОВЛЕННАЯ ТАБЛИЦА */}
             <div className="overflow-x-auto">
                <table className="w-full text-sm text-left">
                    <thead className="bg-slate-50 text-slate-500 font-semibold uppercase text-xs tracking-wider">
@@ -368,6 +366,7 @@ const App = () => {
                            <th className="p-4">Имя</th>
                            <th className="p-4 text-right">Десятина</th>
                            <th className="p-4 text-right">Жертвы</th>
+                           <th className="p-4 text-right">Обеты</th>
                            <th className="p-4 text-right">Всего</th>
                            <th className="p-4 w-10"></th>
                        </tr>
@@ -378,21 +377,19 @@ const App = () => {
                                <td className="p-4 font-bold text-slate-800">{m.name}</td>
                                <td className="p-4 text-right text-emerald-600 font-medium">{m.tithe > 0 ? m.tithe.toLocaleString() : '-'}</td>
                                <td className="p-4 text-right text-blue-600 font-medium">{m.offering > 0 ? m.offering.toLocaleString() : '-'}</td>
+                               <td className="p-4 text-right text-purple-600 font-medium">{m.vow > 0 ? m.vow.toLocaleString() : '-'}</td>
                                <td className="p-4 text-right font-black text-slate-900">{m.total.toLocaleString()}</td>
                                <td className="p-4 text-right">
                                    <button
                                        onClick={() => deleteMember(m.id, m.name)}
                                        className="text-slate-300 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
-                                       title="Удалить человека"
+                                       title="Удалить"
                                    >
                                        <Trash2 className="w-4 h-4" />
                                    </button>
                                </td>
                            </tr>
                        ))}
-                       {members.length === 0 && (
-                           <tr><td colSpan="5" className="p-8 text-center text-slate-400">Список пуст</td></tr>
-                       )}
                    </tbody>
                </table>
             </div>
